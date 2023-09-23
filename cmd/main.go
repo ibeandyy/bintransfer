@@ -10,8 +10,9 @@ import (
 )
 
 var (
-	path   = flag.String("path", "D:/Infogenesis/Log_dir/log_pms", "path to directory")
-	outDir = flag.String("out", "D:/Infogenesis/Log_dir/log_pms/BinBackup", "path to output directory")
+	path     = flag.String("path", "D:/Infogenesis/Log_dir/log_pms", "path to directory")
+	outDir   = flag.String("out", "D:/Infogenesis/Log_dir/log_pms/BinBackup", "path to output directory")
+	interval = flag.Int("interval", 60, "interval in minutes to run MoveBins")
 )
 
 var logger *log.Logger
@@ -39,6 +40,17 @@ func initLogger() {
 }
 
 func main() {
+	ticker := time.NewTicker(time.Duration(*interval) * time.Minute)
+	defer ticker.Stop()
+
+	MoveBins()
+
+	for range ticker.C {
+		MoveBins()
+	}
+}
+
+func MoveBins() {
 	// Construct the bin backup directory with the current date
 	binBackupDir := filepath.Join(*outDir, "BinBackup"+time.Now().Format("2006-01-02"))
 
