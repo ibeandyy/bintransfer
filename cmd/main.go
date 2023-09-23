@@ -2,17 +2,21 @@ package main
 
 import (
 	"flag"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
 var (
-	path   = flag.String("path", "D:/Infogenesis/Log_dir/log_pms", "(absolute or relative) path to directory")
-	outDir = flag.String("out", "D:/Infogenesis/Log_dir/log_pms/BinBackup", "(absolute or relative) path to output directory")
+	path   = flag.String("path", "D:/Infogenesis/Log_dir/log_pms", "relative path to directory")
+	outDir = flag.String("out", "D:/Infogenesis/Log_dir/log_pms/BinBackup", "relative path to output directory")
 )
+
+const maxGoroutines = 100 // Adjust as needed
 
 func main() {
 	flag.Parse()
@@ -32,13 +36,37 @@ func main() {
 		log.Fatal(err)
 	}
 
+	sem := make(chan struct{}, maxGoroutines)
+	var wg sync.WaitGroup
+	errCh := make(chan error)
+
 	// Filter and move .BIN files
 	for _, entry := range entries {
 		if strings.HasSuffix(strings.ToUpper(entry.Name()), ".BIN") {
-			if err := moveFile(filepath.Join(*path, entry.Name()), binBackupDir); err != nil {
-				log.Fatal(err)
-			}
+			wg.Add(1)
+			go func(entry fs.DirEntry) {
+				defer wg.Done()
+
+				sem <- struct{}{} // Acquire semaphore
+				err := moveFile(filepath.Join(*path, entry.Name()), binBackupDir)
+				<-sem // Release semaphore
+
+				if err != nil {
+					errCh <- err
+				}
+			}(entry)
 		}
+	}
+
+	// Close the error channel after all goroutines have completed
+	go func() {
+		wg.Wait()
+		close(errCh)
+	}()
+
+	// Handle errors
+	for err := range errCh {
+		log.Println("Error:", err)
 	}
 }
 
