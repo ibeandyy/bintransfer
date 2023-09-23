@@ -12,19 +12,26 @@ import (
 var (
 	path   = flag.String("path", "D:/Infogenesis/Log_dir/log_pms", "path to directory")
 	outDir = flag.String("out", "D:/Infogenesis/Log_dir/log_pms/BinBackup", "path to output directory")
-	logDir = flag.String("log", "D:/Infogenesis/Log_dir/log_pms/", "path to log directory")
 )
+
 var logger *log.Logger
 
 func init() {
 	flag.Parse()
 	initLogger()
-	logger.Println("Program started at:", time.Now().Format(time.RFC3339))
+	logger.Printf("Program started at: %s\n", time.Now().Format(time.RFC3339))
 }
 
 func initLogger() {
+	// Ensure the BinBackup directory exists
+	if _, err := os.Stat(*outDir); os.IsNotExist(err) {
+		if err := os.Mkdir(*outDir, 0777); err != nil {
+			log.Fatalf("Failed to create output directory: %v", err)
+		}
+	}
+
 	logFileName := "BinMover" + time.Now().Format("2006-01-02") + ".log"
-	logFile, err := os.OpenFile(filepath.Join(*logDir, logFileName), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	logFile, err := os.OpenFile(filepath.Join(*outDir, logFileName), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatalf("Failed to open log file: %v", err)
 	}
@@ -33,7 +40,7 @@ func initLogger() {
 
 func main() {
 	// Construct the bin backup directory with the current date
-	binBackupDir := filepath.Join(*outDir, time.Now().Format("2006-01-02"))
+	binBackupDir := filepath.Join(*outDir, "BinBackup"+time.Now().Format("2006-01-02"))
 
 	// Ensure the directory exists
 	if _, err := os.Stat(binBackupDir); os.IsNotExist(err) {
@@ -54,16 +61,16 @@ func main() {
 			binCount++
 			err := moveFile(filepath.Join(*path, entry.Name()), binBackupDir)
 			if err != nil {
-				logger.Printf("Failed to move file %s: %v", entry.Name(), err)
+				logger.Printf("Failed to move file %s: %v\n", entry.Name(), err)
 			} else {
 				movedCount++
 			}
 		}
 	}
 
-	logger.Printf("Number of .BIN files in the directory: %d", binCount)
-	logger.Printf("Number of moved .BIN files: %d", movedCount)
-	logger.Println("Program exited at:", time.Now().Format(time.RFC3339))
+	logger.Printf("Number of .BIN files in the directory: %d\n", binCount)
+	logger.Printf("Number of moved .BIN files: %d\n", movedCount)
+	logger.Printf("Program exited at: %s\n", time.Now().Format(time.RFC3339))
 }
 
 func moveFile(srcPath, destDir string) error {
